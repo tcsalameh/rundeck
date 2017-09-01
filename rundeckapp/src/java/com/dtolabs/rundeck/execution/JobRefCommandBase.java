@@ -58,6 +58,10 @@ public class JobRefCommandBase extends JobRefCommand implements HasFailureHandle
         return null;
     }
 
+    @Override public Boolean getNodeSuccessOnEmptyNodeFilter() {
+        return null;
+    }
+
     @Override public String getNodeFilter() {
         return null;
     }

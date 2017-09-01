@@ -59,6 +59,7 @@ public class ExecutionContextImpl implements ExecutionContext, StepExecutionCont
     private INodeEntry singleNodeContext;
     private int threadCount;
     private boolean keepgoing;
+    private boolean successOnEmptyNodeFilter;
     private int loglevel;
     private String charsetEncoding;
     private DataContext dataContext;
@@ -170,6 +171,7 @@ public class ExecutionContextImpl implements ExecutionContext, StepExecutionCont
                 ctx.authContext = original.getAuthContext();
                 ctx.threadCount = original.getThreadCount();
                 ctx.keepgoing = original.isKeepgoing();
+                ctx.successOnEmptyNodeFilter = original.isSuccessOnEmptyNodeFilter();
                 ctx.nodeRankAttribute = original.getNodeRankAttribute();
                 ctx.nodeRankOrderAscending = original.isNodeRankOrderAscending();
                 ctx.storageTree = original.getStorageTree();
@@ -388,6 +390,11 @@ public class ExecutionContextImpl implements ExecutionContext, StepExecutionCont
             return this;
         }
 
+        public Builder successOnEmptyNodeFilter(boolean successOnEmptyNodeFilter) {
+            ctx.successOnEmptyNodeFilter = successOnEmptyNodeFilter;
+            return this;
+        }
+
         public Builder nodeRankAttribute(final String nodeRankAttribute) {
             ctx.nodeRankAttribute = nodeRankAttribute;
             return this;
@@ -511,6 +518,10 @@ public class ExecutionContextImpl implements ExecutionContext, StepExecutionCont
 
     public boolean isKeepgoing() {
         return keepgoing;
+    }
+
+    public boolean isSuccessOnEmptyNodeFilter() {
+        return successOnEmptyNodeFilter;
     }
 
     public Map<String, Map<String, String>> getPrivateDataContext() {

@@ -516,7 +516,7 @@ class ExecutionServiceSpec extends Specification {
                 null,
                 context,
                 ['-test1', '${option.test1}', '-test2', '${option.test2}'] as String[],
-                null, null, null, null, null, null, false, true
+                null, null, null, null, null, null, false, false, true
         )
 
         then:
@@ -572,7 +572,7 @@ class ExecutionServiceSpec extends Specification {
                 null,
                 context,
                 [] as String[],
-                null, null, null, null, null, null, false, true
+                null, null, null, null, null, null, false, false, true
         )
 
         then:
@@ -635,7 +635,7 @@ class ExecutionServiceSpec extends Specification {
                 exec,
                 context,
                 args as String[],
-                null, null, null, null, null, null, false, true
+                null, null, null, null, null, null, false, false, true
         )
 
         then:
@@ -713,7 +713,7 @@ class ExecutionServiceSpec extends Specification {
                 null,
                 context,
                 [] as String[],//null values for the input options
-                null, null, null, null, null, null, false, true
+                null, null, null, null, null, null, false, false, true
         )
 
         then:
@@ -786,7 +786,7 @@ class ExecutionServiceSpec extends Specification {
                 null,
                 context,
                 ['-test1', '${option.zilch}', '-test2', '${option.test2}'] as String[],
-                null, null, null, null, null, null, false, true
+                null, null, null, null, null, null, false, false, true
         )
 
         then:
@@ -859,7 +859,7 @@ class ExecutionServiceSpec extends Specification {
                 ['-test3', '${rarity.globular}', '-test1', '${option.zilch}', '-test2', '${option.test2}'] as String[],
                 null, null, null, null, null,
                 contextNode,
-                false, true
+                false, false, true
         )
 
         then:
@@ -925,6 +925,7 @@ class ExecutionServiceSpec extends Specification {
                 true,
                 null,
                 null,
+                false,
                 false
         )
 
@@ -943,6 +944,67 @@ class ExecutionServiceSpec extends Specification {
         '${nodecontext.nodea@anode} x y' | ['a', 'x', 'y']
     }
 
+
+    def "overrideJobReferenceNodeFilter will override successOnEmptyNodeFilter when specified"() {
+      given:
+      def sharedContext = SharedDataContextUtils.sharedContext()
+      sharedContext.merge(ContextView.global(), DataContextUtils.context("shared", [nodea: "b"]))
+      sharedContext.merge(ContextView.global(), DataContextUtils.context("global", [nodea: "a"]))
+      sharedContext.merge(ContextView.node('anode'), DataContextUtils.context("shared", [nodea: "c"]))
+      sharedContext.merge(ContextView.node('anode'), DataContextUtils.context("nodecontext", [nodea: "a"]))
+
+      def makeNodeSet = { list ->
+          def nodeset = new NodeSetImpl()
+          list.each {
+              nodeset.putNode(new NodeEntryImpl(it))
+          }
+          nodeset
+      }
+      def allNodes = makeNodeSet(['a', 'b', 'c', 'x', 'y', 'z'])
+      def context = ExecutionContextImpl.builder()
+                                        .nodes(allNodes)
+                                        .nodeSelector(SelectorUtils.nodeList(['a', 'b', 'c', 'x', 'y', 'z']))
+                                        .threadCount(1)
+                                        .keepgoing(false)
+                                        .dataContext(DataContextUtils.context('data', [nodea: 'z']))
+                                        .mergeSharedContext(sharedContext)
+                                        .build()
+      service.frameworkService = Mock(FrameworkService) {
+          1 * filterNodeSet(_, _) >> { args ->
+              com.dtolabs.rundeck.core.common.NodeFilter.filterNodes(args[0], allNodes)
+          }
+          1 * filterAuthorizedNodes(_, _, _, _) >> { args ->
+              args[2]
+          }
+          0 * _(*_)
+      }
+
+      service.storageService = Mock(StorageService)
+      service.jobStateService = Mock(JobStateService)
+
+      when:
+
+      def newCtxt = service.overrideJobReferenceNodeFilter(
+              null,
+              context,
+              ExecutionContextImpl.builder().build(),
+              'x y',
+              2,
+              true,
+              null,
+              null,
+              false,
+              successOnEmptyNodeFilter
+      )
+
+      then:
+      newCtxt.isSuccessOnEmptyNodeFilter() == expect as boolean
+
+      where:
+      successOnEmptyNodeFilter | expect
+      true                     | true
+      false                    | false
+    }
 
     def "Create execution context with global vars"() {
         given:

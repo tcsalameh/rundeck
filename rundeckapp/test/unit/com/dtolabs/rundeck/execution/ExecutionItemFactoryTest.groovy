@@ -349,6 +349,14 @@ class ExecutionItemFactoryTest {
         assertJobExecutionItem(testcommand, 'monkey/piece', ['args', 'args2'], false, true,
                                null, false, null, null, null, null)
     }
+    // @Test
+    // public void createJobRef_nodeSuccessOnEmptyNodeFilter(){
+    //
+    // }
+    // @Test
+    // public void createJobRef_nodeSuccessOnEmptyNodeFilterFalse(){
+    //
+    // }
     @Test
     public void createJobRef_nodeRankAttribute(){
         StepExecutionItem test = ExecutionItemFactory.createJobRef(

@@ -2785,6 +2785,7 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
      * @param nodeKeepgoing
      * @return
      */
+    // TODO: Decide whether we want to use this function to override successOnEmptyNodeFilter
     StepExecutionContext overrideJobReferenceNodeFilter(
             INodeEntry node,
             StepExecutionContext origContext,
@@ -2794,9 +2795,11 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             Boolean nodeKeepgoing,
             String nodeRankAttribute,
             Boolean nodeRankOrderAscending,
-            Boolean nodeIntersect
+            Boolean nodeIntersect,
+            Boolean nodeSuccessOnEmptyNodeFilter
     )
     {
+        // TODO: What does the builder do? Which args can it take?
         def builder = ExecutionContextImpl.builder(newContext);
 
         if (nodeFilter) {
@@ -2841,6 +2844,9 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             if (null != nodeKeepgoing) {
                 builder.keepgoing(nodeKeepgoing)
             }
+            if (null != nodeSuccessOnEmptyNodeFilter) {
+                builder.successOnEmptyNodeFilter(nodeSuccessOnEmptyNodeFilter)
+            }
             if (null != nodeRankAttribute) {
                 builder.nodeRankAttribute(nodeRankAttribute)
             }
@@ -2879,6 +2885,7 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
      * @return
      * @throws ExecutionServiceValidationException if input argument validation fails
      */
+    // TODO: Change function sig so it can inherit successOnEmptyNodeFilter
     StepExecutionContext createJobReferenceContext(
             ScheduledExecution se,
             Execution exec,
@@ -2891,16 +2898,21 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             Boolean nodeRankOrderAscending,
             INodeEntry node,
             Boolean nodeIntersect,
+            Boolean nodeSuccessOnEmptyNodeFilter,
             dovalidate
     )
     throws ExecutionServiceValidationException
     {
 
         //substitute any data context references in the arguments
+        // TODO: What is newargs? Are these things to override from sharedDataContext?
         if (null != newargs && executionContext.sharedDataContext) {
             def curDate=exec?exec.dateStarted: new Date()
+            // NOTE: It looks like this collects the newargs into an array
+            // merging them with the current Date
             newargs = newargs.collect { expandDateStrings(it, curDate) }.toArray()
 
+            // TODO: What does replaceDataReferences do? where is it defined?
             newargs = SharedDataContextUtils.replaceDataReferences(
                     newargs,
                     executionContext.sharedDataContext,
@@ -2912,9 +2924,13 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             )
         }
 
+        // NOTE: This appears to be creating a map from the new arguments
+        // TODO: What does parseOptsFromArray do?
         def jobOptsMap = frameworkService.parseOptsFromArray(newargs)
+        // TODO: What is se?
         jobOptsMap = addOptionDefaults(se, jobOptsMap)
 
+        // NOTE: Code below appears to be for encrypted options only.
         //select secureAuth and secure options from the args to pass
         Map<String,String> secAuthOpts = selectSecureOptionInput(se, [optparams: jobOptsMap], false)
         Map<String,String> secOpts = selectSecureOptionInput(se, [optparams: jobOptsMap], true)
@@ -2947,6 +2963,7 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             }
         }
 
+        // NOTE: Code below appears to be for plain option parsing only.
         //for plain opts, evaluate in context of non secure data context
         final Map<String,String> plainOpts = removeSecureOptionEntries(se, jobOptsMap)
 
@@ -2974,6 +2991,7 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
         newargs = stringList.toArray(new String[stringList.size()]);
 
         //construct job data context
+        // TODO: This looks like where we'd construct the successOnEmptyNodeFilter override
         def jobcontext = new HashMap<String, String>(executionContext.dataContext.job?:[:])
         jobcontext.id = se.extid
         jobcontext.loglevel = mappedLogLevels[executionContext.loglevel]
@@ -2992,6 +3010,12 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
                 evalSecOpts
         )
 
+        // TODO: What does overrideJobReferenceNodeFilter do?
+        // TODO: Can we leverage this to override successOnEmptyNodeFilter?
+        // NOTE: Maybe we only override successOnEmptyNodeFilter if nodeIntersect is true.
+        // NOTE: Are there situations where we'd want to override successOnEmptyNodeFilter but not nodeIntersect?
+        // NOTE: Yes, I think there are situations where we'd want to override successOnEmptyNodeFilter and nothing else.
+        // NOTE: Implies that we need another if statement like this.
         if (nodeFilter || nodeIntersect) {
             newContext = overrideJobReferenceNodeFilter(
                     node,
@@ -3002,7 +3026,8 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
                     nodeKeepgoing,
                     nodeRankAttribute,
                     nodeRankOrderAscending,
-                    nodeIntersect
+                    nodeIntersect,
+                    nodeSuccessOnEmptyNodeFilter
             )
         }
         return newContext
@@ -3081,10 +3106,12 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
             newExecItem = executionUtilService.createExecutionItemForWorkflow(se.workflow)
 
             try {
+                // TODO: Make the new context include successOnEmptyNodeFilter
                 newContext = createJobReferenceContext(
                         se,
                         exec,
                         executionContext,
+                        // TODO: what is jitem?
                         jitem.args,
                         jitem.nodeFilter,
                         jitem.nodeKeepgoing,
@@ -3093,6 +3120,7 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
                         jitem.nodeRankOrderAscending,
                         node,
                         jitem.nodeIntersect,
+                        jitem.nodeSuccessOnEmptyNodeFilter,
                         true
                 )
             } catch (ExecutionServiceValidationException e) {
@@ -3106,9 +3134,12 @@ class ExecutionService implements ApplicationContextAware, StepExecutor, NodeSte
         }
 
         if (newContext.getNodes().getNodeNames().size() < 1) {
-            String msg = "No nodes matched for the filters: " + newContext.getNodeSelector()
-            executionContext.getExecutionListener().log(0, msg)
-            throw new StepException(msg, JobReferenceFailureReason.NoMatchedNodes)
+            // TODO: Check for successOnEmptyNodeFilter here
+            if (!newContext.isSuccessOnEmptyNodeFilter()) {
+                String msg = "No nodes matched for the filters: " + newContext.getNodeSelector()
+                executionContext.getExecutionListener().log(0, msg)
+                throw new StepException(msg, JobReferenceFailureReason.NoMatchedNodes)
+            }
         }
 
         def WorkflowExecutionService service = executionContext.getFramework().getWorkflowExecutionService()

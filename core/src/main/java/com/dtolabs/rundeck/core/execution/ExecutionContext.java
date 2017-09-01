@@ -115,6 +115,11 @@ public interface ExecutionContext {
     boolean isKeepgoing();
 
     /**
+     * @return whether to allow success on empty node filters
+     */
+    boolean isSuccessOnEmptyNodeFilter();
+
+    /**
      * Return the loglevel value, using the Ant equivalents: DEBUG=1,
      *
      * @return log level from 0-4: ERR,WARN,INFO,VERBOSE,DEBUG
